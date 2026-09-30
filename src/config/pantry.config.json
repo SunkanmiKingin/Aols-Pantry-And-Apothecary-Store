@@ -1,0 +1,81 @@
+{
+  "brand": {
+    "name": "Akinnike Ols Pantry & Apothecary",
+    "shortName": "Akinnike Ols",
+    "tagline": "Heritage ingredients, stone-ground for the modern kitchen.",
+    "description": "A premium homemade dry pantry and apothecary store offering carefully sourced, prepared and blended ingredients for the modern home. From signature Nigerian spice and soup blends to dried herbs, fruits, vegetables, proteins, grains and botanical teas.",
+    "address": "Southwest Logistics Atelier (Lagos & Ibadan), Nigeria",
+    "email": "orders@akinnikeols.com"
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+      "number": "07051377659",
+      "countryCode": "234",
+      "displayNumber": "+234 705 137 7659",
+      "welcomePrompt": "Hello Akinnike Ols Pantry! I would like to inquire about your handcrafted blends."
+    },
+    "telegram": {
+      "enabled": true,
+      "handle": "@AkinnikeOlsPantry",
+      "url": "https://t.me/AkinnikeOlsPantry",
+      "note": "AI Orchestration Bot on Telegram"
+    },
+    "instagram": {
+      "enabled": true,
+      "handle": "@akinnikeols",
+      "url": "https://instagram.com/akinnikeols",
+      "note": "Apothecary Atelier Visuals & DMs"
+    }
+  },
+  "backendApi": {
+    "webhookUrl": "https://nodus.com/api/webhooks",
+    "secretToken": "akinnike_pantry_live_key_9942",
+    "timeoutMs": 8000,
+    "retryAttempts": 3
+  },
+  "shippingEstimates": [
+    {
+      "id": "southwest",
+      "name": "Southwest Nigeria Express (Primary Hub)",
+      "coverage": "Lagos, Ibadan, Ogun, Osun, Ondo, Ekiti",
+      "deliveryDays": "24 - 48 hours",
+      "minNgn": 2000,
+      "maxNgn": 3500,
+      "note": "Primary dispatch from Lagos & Ibadan hubs. Rates vary by local mileage."
+    },
+    {
+      "id": "nationwide",
+      "name": "Nationwide Nigeria Interstate",
+      "coverage": "Abuja FCT, Port Harcourt, Kano, Kaduna, Enugu & All States",
+      "deliveryDays": "2 - 4 business days",
+      "minNgn": 4000,
+      "maxNgn": 7500,
+      "note": "Reliable interstate logistics partners."
+    },
+    {
+      "id": "diaspora",
+      "name": "African Continental & Global Diaspora",
+      "coverage": "United Kingdom, United States, Canada, Europe & Africa",
+      "deliveryDays": "4 - 7 business days",
+      "minNgn": 25000,
+      "maxNgn": 45000,
+      "note": "Hermetically sealed export packs via DHL / FedEx Express."
+    }
+  ],
+  "currencies": {
+    "NGN": { "symbol": "₦", "label": "NGN - Nigerian Naira", "rateToNgn": 1 },
+    "USD": { "symbol": "$", "label": "USD - US Dollar", "rateToNgn": 1550 },
+    "GBP": { "symbol": "£", "label": "GBP - British Pound", "rateToNgn": 2020 },
+    "EUR": { "symbol": "€", "label": "EUR - Euro", "rateToNgn": 1690 },
+    "GHS": { "symbol": "GH₵", "label": "GHS - Ghanaian Cedi", "rateToNgn": 105 },
+    "KES": { "symbol": "KSh", "label": "KES - Kenyan Shilling", "rateToNgn": 12 },
+    "ZAR": { "symbol": "R", "label": "ZAR - South African Rand", "rateToNgn": 88 }
+  },
+  "featureFlags": {
+    "enableOrderOnWebsite": true,
+    "enableDirectWhatsApp": true,
+    "enableHandoffSessionRef": true,
+    "enableChefBatchInquiry": true
+  }
+}

@@ -1,18 +1,20 @@
-import { OrderRecord, IntegrationSettings } from '../types';
+import { OrderRecord } from '../types';
+import { getPantryConfig } from '../config';
 
 export interface WebhookLogEntry {
   id: string;
   timestamp: string;
   endpoint: string;
+  event: 'order.created' | 'cart.whatsapp_initiated' | 'inquiry.submitted' | 'webhook.ping';
   orderNumber?: string;
-  event: 'order.created' | 'webhook.ping' | 'inquiry.created';
+  sessionRef?: string;
   payload: any;
   status: 'success' | 'network_error' | 'pending';
   responseCode?: number;
   responseMessage?: string;
 }
 
-const STORAGE_KEY_WEBHOOK_LOGS = 'akinnike_webhook_logs';
+const STORAGE_KEY_WEBHOOK_LOGS = 'akinnike_webhook_logs_v2';
 
 export function getWebhookLogs(): WebhookLogEntry[] {
   try {
@@ -28,69 +30,70 @@ export function getWebhookLogs(): WebhookLogEntry[] {
 export function saveWebhookLog(entry: WebhookLogEntry): void {
   try {
     const current = getWebhookLogs();
-    const updated = [entry, ...current].slice(0, 50); // keep last 50 logs
+    const updated = [entry, ...current].slice(0, 50);
     localStorage.setItem(STORAGE_KEY_WEBHOOK_LOGS, JSON.stringify(updated));
   } catch (err) {
     console.error('Failed to save webhook log:', err);
   }
 }
 
-export async function dispatchOrderWebhook(
-  order: OrderRecord,
-  settings: IntegrationSettings
+export async function dispatchMultichannelWebhook(
+  event: 'order.created' | 'cart.whatsapp_initiated' | 'inquiry.submitted',
+  order: OrderRecord
 ): Promise<{ success: boolean; statusCode?: number; message: string }> {
-  const endpoint = settings.webhookUrl || 'https://nodus.com/api/webhooks';
+  const config = getPantryConfig();
+  const endpoint = config.backendApi.webhookUrl || 'https://nodus.com/api/webhooks';
 
   const payload = {
-    event: 'order.created',
-    version: '1.0',
+    event,
+    channel: 'web_storefront',
+    source_url: typeof window !== 'undefined' ? window.location.href : '',
     timestamp: new Date().toISOString(),
-    source: 'Akinnike Ols Pantry & Apothecary Storefront',
-    data: {
-      orderId: order.id,
-      orderNumber: order.orderNumber,
+    session_ref: order.sessionRef,
+    customer: {
+      name: order.customer.customerName,
+      phone: order.customer.phone,
+      email: order.customer.email || null,
+      delivery_address: order.customer.address,
+      city: order.customer.city || null,
+      region: order.customer.stateOrRegion,
+      country: order.customer.country,
+      delivery_zone: order.customer.deliveryZone,
+      notes: order.customer.notes || null,
+      preferred_channel: order.customer.preferredChannel || 'web_storefront',
+    },
+    order: {
+      order_number: order.orderNumber,
       date: order.date,
-      customer: {
-        name: order.customer.customerName,
-        phone: order.customer.phone,
-        email: order.customer.email,
-        deliveryAddress: order.customer.address,
-        city: order.customer.city,
-        state: order.customer.stateOrRegion,
-        country: order.customer.country,
-        deliveryZone: order.customer.deliveryZone,
-        notes: order.customer.notes,
-        preferredContact: order.customer.preferredContact,
-      },
-      items: order.items.map(item => ({
-        productId: item.product.id,
-        productName: item.product.name,
+      status: order.status,
+      items: order.items.map((item) => ({
+        product_id: item.product.id,
+        product_name: item.product.name,
         category: item.product.category,
         sku: item.variation.sku,
-        variationName: item.variation.name,
-        sizeGrams: item.variation.sizeGrams,
-        cutOrGrind: item.selectedCutOrGrind || null,
-        heatLevel: item.selectedHeatLevel || null,
+        variation_name: item.variation.name,
+        size_grams: item.variation.sizeGrams,
+        cut_or_grind: item.selectedCutOrGrind || null,
+        heat_level: item.selectedHeatLevel || null,
         quantity: item.quantity,
-        priceNgn: item.variation.priceNgn,
-        lineTotalNgn: item.variation.priceNgn * item.quantity,
+        unit_price_ngn: item.variation.priceNgn,
+        line_total_ngn: item.variation.priceNgn * item.quantity,
       })),
-      pricing: {
-        totalNgn: order.totalNgn,
-        currency: order.currency,
-        totalInCurrency: order.totalInCurrency,
-      },
-      channel: order.channel,
-      status: order.status,
+      financials: {
+        subtotal_ngn: order.subtotalNgn,
+        currency_code: order.currency,
+        shipping_estimate_range: order.shippingEstimateRange,
+      }
     }
   };
 
   const logEntry: WebhookLogEntry = {
-    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     timestamp: new Date().toISOString(),
     endpoint,
+    event,
     orderNumber: order.orderNumber,
-    event: 'order.created',
+    sessionRef: order.sessionRef,
     payload,
     status: 'pending',
   };
@@ -100,16 +103,15 @@ export async function dispatchOrderWebhook(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Pantry-Secret': settings.webhookSecretToken || 'akinnike-secret',
-        'X-Event-Type': 'order.created',
+        'X-Pantry-Secret': config.backendApi.secretToken || 'akinnike-secret',
+        'X-Event-Type': event,
       },
       body: JSON.stringify(payload),
-      // mode: 'cors' is default; no-cors allows dispatch even if server hasn't set permissive CORS
     });
 
     logEntry.status = response.ok ? 'success' : 'network_error';
     logEntry.responseCode = response.status;
-    logEntry.responseMessage = response.statusText || (response.ok ? 'Dispatched successfully' : 'HTTP Error');
+    logEntry.responseMessage = response.statusText || (response.ok ? 'Accepted by Nodus Webhook API' : 'HTTP Error');
     saveWebhookLog(logEntry);
 
     return {
@@ -118,27 +120,22 @@ export async function dispatchOrderWebhook(
       message: response.ok ? 'Webhook successfully accepted by endpoint.' : `Server responded with ${response.status}`,
     };
   } catch (error: any) {
-    // In browser environments without pre-flight CORS headers on 3rd party webhooks, fetch might reject, but we can also fire with mode: 'no-cors' or log the full payload.
-    console.warn('Webhook dispatch network note (may be CORS restricted on 3rd party endpoint):', error);
-
+    // Graceful no-cors transport fallback
     try {
-      // Secondary attempt with no-cors so packet reaches server regardless
       await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         mode: 'no-cors',
         body: JSON.stringify(payload),
       });
       logEntry.status = 'success';
       logEntry.responseCode = 200;
-      logEntry.responseMessage = 'Dispatched via no-cors transport to external webhook';
+      logEntry.responseMessage = 'Dispatched via no-cors transport to external backend';
       saveWebhookLog(logEntry);
       return {
         success: true,
         statusCode: 200,
-        message: 'Payload queued and dispatched to ' + endpoint,
+        message: 'Payload dispatched to backend orchestration endpoint.',
       };
     } catch (e2: any) {
       logEntry.status = 'network_error';
@@ -152,14 +149,15 @@ export async function dispatchOrderWebhook(
   }
 }
 
-export async function testWebhookPing(settings: IntegrationSettings): Promise<{ success: boolean; message: string; statusCode?: number }> {
-  const endpoint = settings.webhookUrl || 'https://nodus.com/api/webhooks';
+export async function testWebhookPing(): Promise<{ success: boolean; message: string; statusCode?: number }> {
+  const config = getPantryConfig();
+  const endpoint = config.backendApi.webhookUrl || 'https://nodus.com/api/webhooks';
   const pingPayload = {
     event: 'webhook.ping',
     timestamp: new Date().toISOString(),
-    source: 'Akinnike Ols Pantry & Apothecary Admin Console',
-    message: 'Test ping to verify API connectivity from storefront to Nodus Webhook backend.',
-    sender: 'Akinnike Ols Admin'
+    source: 'Akinnike Ols Pantry & Apothecary Orchestrator Diagnostic',
+    channel: 'web_storefront',
+    message: 'Diagnostic ping verifying connectivity to Nodus Webhook API.',
   };
 
   const logEntry: WebhookLogEntry = {
@@ -176,14 +174,14 @@ export async function testWebhookPing(settings: IntegrationSettings): Promise<{ 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Pantry-Secret': settings.webhookSecretToken,
+        'X-Pantry-Secret': config.backendApi.secretToken,
       },
       body: JSON.stringify(pingPayload),
     });
 
     logEntry.status = res.ok ? 'success' : 'network_error';
     logEntry.responseCode = res.status;
-    logEntry.responseMessage = res.statusText || 'Ping response received';
+    logEntry.responseMessage = res.statusText || 'Diagnostic response received';
     saveWebhookLog(logEntry);
 
     return {
@@ -192,7 +190,6 @@ export async function testWebhookPing(settings: IntegrationSettings): Promise<{ 
       message: res.ok ? `Ping successful (Status ${res.status})` : `Server responded with HTTP ${res.status}`,
     };
   } catch (err: any) {
-    // Attempt no-cors transport
     try {
       await fetch(endpoint, {
         method: 'POST',

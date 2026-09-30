@@ -1,56 +1,42 @@
 export type CurrencyCode = 'NGN' | 'USD' | 'GBP' | 'EUR' | 'GHS' | 'KES' | 'ZAR';
 
-export interface CurrencyConfig {
-  code: CurrencyCode;
-  symbol: string;
-  label: string;
-  rateToNgn: number; // 1 Unit of this currency = X NGN (or NGN as base = 1)
-  exchangeRateFromNgn: number; // Multiply NGN price by this to get foreign price
-}
-
 export interface ProductVariation {
   id: string;
-  name: string; // e.g. "100g Amber Apothecary Glass", "250g Aromalock Craft Pouch", "500g Chef Pantry Tub"
-  sizeGrams?: number;
+  sku: string;
+  name: string;
+  sizeGrams: number;
   priceNgn: number;
   inStock: boolean;
-  sku: string;
-  cutOrGrindOptions?: string[]; // e.g. ["Fine Stone-Ground", "Coarse Mortar Crush"] or ["Shredded Strands", "Chunky Bites"]
-  heatLevels?: string[]; // e.g. ["Mild Warmth", "Traditional Heat", "Extra Fiery"]
-  flavourNotes?: string[];
+  cutOrGrindOptions?: string[];
+  heatLevels?: string[];
+  dietaryBadges?: string[];
 }
 
-export type ProductCategory = 
-  | 'signature-concoctions' 
-  | 'flavoured-proteins' 
-  | 'pantry-essentials' 
-  | 'botanical-teas';
+export interface ReviewItem {
+  author: string;
+  location: string;
+  quote: string;
+  rating: number;
+}
 
 export interface Product {
   id: string;
   slug: string;
   name: string;
   tagline: string;
-  category: ProductCategory;
+  category: 'signature-concoctions' | 'flavoured-proteins' | 'pantry-essentials' | 'botanical-teas';
   categoryName: string;
-  advertisedFirst?: boolean;
-  landingPageUrl: string;
-  badge?: string; // e.g. "Artisan Small Batch", "Sun-Dried & Stone-Ground", "No Preservatives"
+  advertisedFirst: boolean;
+  badge?: string;
   description: string;
   longDescription: string;
+  originAndProcess: string;
   ingredients: string[];
   culinaryUses: string[];
-  originAndProcess: string;
   storageInstructions: string;
-  accentColor: string; // for rich visual theme
-  iconType: 'soup' | 'protein' | 'spice' | 'tea' | 'broth';
   variations: ProductVariation[];
-  featuredReviews?: {
-    author: string;
-    location: string;
-    rating: number;
-    quote: string;
-  }[];
+  landingPageUrl: string;
+  featuredReviews?: ReviewItem[];
 }
 
 export interface CartItem {
@@ -65,46 +51,91 @@ export interface CartItem {
 export interface CustomerOrderData {
   customerName: string;
   phone: string;
-  email: string;
+  email?: string;
   address: string;
-  city: string;
+  city?: string;
   stateOrRegion: string;
   country: string;
-  deliveryZone: 'southwest' | 'nigeria-wide' | 'diaspora-international';
-  notes: string;
-  preferredContact: 'whatsapp' | 'call' | 'email';
+  deliveryZone: string;
+  notes?: string;
+  preferredChannel?: 'whatsapp' | 'web_storefront' | 'telegram' | 'instagram';
 }
 
 export interface OrderRecord {
   id: string;
   orderNumber: string;
+  sessionRef: string;
   date: string;
   customer: CustomerOrderData;
   items: CartItem[];
-  totalNgn: number;
+  subtotalNgn: number;
+  shippingEstimateRange: string;
   currency: CurrencyCode;
-  totalInCurrency: number;
+  approxCurrencyAmount?: number;
   status: 'new' | 'contacted' | 'packed' | 'dispatched' | 'completed';
-  channel: 'whatsapp' | 'webhook_api' | 'direct';
+  channel: 'whatsapp' | 'web_storefront';
   webhookDispatched: boolean;
   webhookResponseStatus?: number;
 }
 
-export interface IntegrationSettings {
-  whatsappNumber: string; // e.g. "07051377659"
-  whatsappCountryCode: string; // "234"
-  whatsappConciergeName: string;
-  webhookUrl: string; // "https://nodus.com/api/webhooks"
-  webhookSecretToken: string;
-  enableAutoWebhookDispatch: boolean;
-  businessEmail: string;
-  businessPhoneDisplay: string;
-  physicalLocation: string;
-  shippingZones: {
-    id: 'southwest' | 'nigeria-wide' | 'diaspora-international';
+export interface ShippingZoneEstimate {
+  id: string;
+  name: string;
+  coverage: string;
+  deliveryDays: string;
+  minNgn: number;
+  maxNgn: number;
+  note: string;
+}
+
+export interface CurrencyConfig {
+  symbol: string;
+  label: string;
+  rateToNgn: number;
+}
+
+export interface PantryConfig {
+  brand: {
     name: string;
-    estimatedDays: string;
-    feeNgn: number;
+    shortName: string;
+    tagline: string;
     description: string;
-  }[];
+    address: string;
+    email: string;
+  };
+  channels: {
+    whatsapp: {
+      enabled: boolean;
+      number: string;
+      countryCode: string;
+      displayNumber: string;
+      welcomePrompt: string;
+    };
+    telegram: {
+      enabled: boolean;
+      handle: string;
+      url: string;
+      note: string;
+    };
+    instagram: {
+      enabled: boolean;
+      handle: string;
+      url: string;
+      note: string;
+    };
+  };
+  backendApi: {
+    webhookUrl: string;
+    secretToken: string;
+    timeoutMs: number;
+    retryAttempts: number;
+  };
+  shippingEstimates: ShippingZoneEstimate[];
+  currencies: Record<CurrencyCode, CurrencyConfig>;
+  featureFlags: {
+    enableOrderOnWebsite: boolean;
+    enableDirectWhatsApp: boolean;
+    enableHandoffSessionRef: boolean;
+    enableChefBatchInquiry: boolean;
+  };
 }

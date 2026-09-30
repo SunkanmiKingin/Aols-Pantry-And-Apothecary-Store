@@ -1,17 +1,14 @@
-import { CartItem, CustomerOrderData, CurrencyCode, IntegrationSettings } from '../types';
+import { CartItem, CustomerOrderData, CurrencyCode } from '../types';
 import { formatPrice } from './currency';
+import { getPantryConfig } from '../config';
 
 export function sanitizePhoneNumberForWhatsApp(phone: string, defaultCountryCode: string = '234'): string {
-  // Strip all non-digit characters
   let cleaned = phone.replace(/\D/g, '');
-  
-  // If Nigerian local format starting with '0', convert to country code (e.g. 07051377659 -> 2347051377659)
   if (cleaned.startsWith('0') && cleaned.length === 11) {
     cleaned = defaultCountryCode + cleaned.slice(1);
   } else if (!cleaned.startsWith(defaultCountryCode) && cleaned.length === 10) {
     cleaned = defaultCountryCode + cleaned;
   }
-  
   return cleaned;
 }
 
@@ -19,29 +16,29 @@ export function generateWhatsAppOrderMessage(params: {
   customer: CustomerOrderData;
   items: CartItem[];
   currency: CurrencyCode;
-  settings: IntegrationSettings;
   orderNumber: string;
-  shippingFeeNgn: number;
+  sessionRef: string;
+  shippingRangeText: string;
 }): string {
-  const { customer, items, currency, orderNumber, shippingFeeNgn } = params;
+  const { customer, items, currency, orderNumber, sessionRef, shippingRangeText } = params;
+  const config = getPantryConfig();
 
   let subtotalNgn = 0;
-  items.forEach(item => {
+  items.forEach((item) => {
     subtotalNgn += item.variation.priceNgn * item.quantity;
   });
-  const grandTotalNgn = subtotalNgn + shippingFeeNgn;
 
   const zoneNames: Record<string, string> = {
-    southwest: 'Southwest Nigeria (Primary Express)',
-    'nigeria-wide': 'Nationwide Nigeria (Interstate)',
-    'diaspora-international': 'African Continental & Diaspora Express (UK/US/Global)',
+    southwest: 'Southwest Nigeria (Primary Hub Express)',
+    nationwide: 'Nationwide Nigeria (Interstate Courier)',
+    diaspora: 'African Continental & Diaspora Express (DHL/FedEx)',
   };
 
   const lines: string[] = [
     `🌿 *AKINNIKE OLS PANTRY & APOTHECARY*`,
-    `*Order Request: #${orderNumber}*`,
+    `*Order Request: #${orderNumber}*  [Session Ref: *${sessionRef}*]`,
     `----------------------------------------`,
-    `👤 *CUSTOMER DETAILS:*`,
+    `👤 *CUSTOMER PROFILE:*`,
     `• Name: ${customer.customerName || 'Valued Customer'}`,
     `• Phone: ${customer.phone}`,
     customer.email ? `• Email: ${customer.email}` : '',
@@ -56,52 +53,48 @@ export function generateWhatsAppOrderMessage(params: {
     const itemTotalNgn = item.variation.priceNgn * item.quantity;
     lines.push(
       `\n${index + 1}. *${item.product.name}*`,
-      `   • Size / Pack: ${item.variation.name}`,
+      `   • Pack / Size: ${item.variation.name}`,
       item.selectedCutOrGrind ? `   • Cut / Grind: ${item.selectedCutOrGrind}` : '',
       item.selectedHeatLevel ? `   • Heat / Flavour: ${item.selectedHeatLevel}` : '',
-      `   • Qty: ${item.quantity} × ${formatPrice(item.variation.priceNgn, currency)} = *${formatPrice(itemTotalNgn, currency)}*`
+      `   • Qty: ${item.quantity} × ${formatPrice(item.variation.priceNgn, currency, true)} = *${formatPrice(itemTotalNgn, currency, true)}*`
     );
   });
 
   lines.push(
     `\n----------------------------------------`,
-    `💰 *PAYMENT SUMMARY:*`,
-    `• Subtotal: ${formatPrice(subtotalNgn, currency)}`,
-    `• Est. Shipping: ${formatPrice(shippingFeeNgn, currency)}`,
-    `• *GRAND TOTAL: ${formatPrice(grandTotalNgn, currency)}*`
+    `💰 *PAYMENT ESTIMATE SUMMARY:*`,
+    `• Items Subtotal: *${formatPrice(subtotalNgn, currency, true)}*`,
+    `• Est. Shipping Range: *${shippingRangeText}*`,
+    `  _(Final courier tariff confirmed based on exact delivery coordinates)_`
   );
 
   if (customer.notes && customer.notes.trim()) {
     lines.push(
       `----------------------------------------`,
-      `📝 *SPECIAL NOTES & INSTRUCTIONS:*`,
+      `📝 *SPECIAL NOTES & DIETARY PREFERENCES:*`,
       customer.notes.trim()
     );
   }
 
   lines.push(
     `----------------------------------------`,
-    `Kindly confirm batch availability, payment details, and estimated dispatch time. Thank you!`
+    `Kindly confirm batch availability, payment account details, and dispatch timing. Thank you!`
   );
 
   return lines.filter(Boolean).join('\n');
 }
 
-export function buildWhatsAppDirectLink(params: {
-  phone: string;
-  message: string;
-  defaultCountryCode?: string;
-}): string {
-  const cleanPhone = sanitizePhoneNumberForWhatsApp(params.phone, params.defaultCountryCode || '234');
-  const encodedText = encodeURIComponent(params.message);
-  return `https://wa.me/${cleanPhone}?text=${encodedText}`;
+export function buildWhatsAppDirectLink(message: string): string {
+  const config = getPantryConfig();
+  const phone = sanitizePhoneNumberForWhatsApp(
+    config?.channels?.whatsapp?.number || '07051377659',
+    config?.channels?.whatsapp?.countryCode || '234'
+  );
+  const encodedText = encodeURIComponent(message);
+  return `https://wa.me/${phone}?text=${encodedText}`;
 }
 
-export function openWhatsAppChat(params: {
-  phone: string;
-  message: string;
-  defaultCountryCode?: string;
-}): void {
-  const url = buildWhatsAppDirectLink(params);
+export function openWhatsAppChat(message: string): void {
+  const url = buildWhatsAppDirectLink(message);
   window.open(url, '_blank', 'noopener,noreferrer');
 }
