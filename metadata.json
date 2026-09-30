@@ -1,0 +1,9 @@
+{
+  "name": "Akinnike Ols Pantry & Apothecary",
+  "description": "Premium homemade dry pantry & apothecary store offering carefully sourced, prepared and blended Nigerian spice blends, flavoured proteins, and botanical essentials.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
